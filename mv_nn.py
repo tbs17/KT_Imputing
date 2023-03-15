@@ -11,8 +11,6 @@ from tst.encoder import Encoder
 from tst.decoder import Decoder
 from tst.utils import generate_original_PE, generate_regular_PE
 
-# -----------------below is the Non Transfer version MV NN---------------
-
 
 class LSTM(nn.Module):
     def __init__(self, na_fill_type,input_size, hidden_size, num_layers, output_size,device):
@@ -22,15 +20,12 @@ class LSTM(nn.Module):
         self.num_layers = num_layers
         self.output_size = output_size
         self._na_fill_type=na_fill_type
-        # self.device = device 
+
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.linear = nn.Linear(hidden_size, output_size)
         self.device=device
 
-    # def reset_hidden_state(self,batch_size): #here is the initial hidden state and cell state
-    #     self.hidden = (torch.zeros(self.num_layers, batch_size, self.hidden_size).to(self.device),
-    #                    torch.zeros(self.num_layers, batch_size, self.hidden_size).to(self.device))
-    def init_hidden(self, batch_size):
+     def init_hidden(self, batch_size):
         """
         initialize hidden layer as zero tensor
         batch_size: single integer
@@ -40,71 +35,32 @@ class LSTM(nn.Module):
                 weight.new_zeros(self.num_layers, batch_size, self.hidden_size))
     
     def forward(self, data):
-        # input shape: (batch, seq_len, input_size) (how many sequences, train window, how many features)
-        # output shape: (seq_len, output_size, input_size)
+
         if self._na_fill_type!='mask':
             input=data
             batch_size = input.shape[0]
-            # print(f'input shape: {input.shape}')
+
         else:
             input, input_lengths=data
-            
-             #use none to increase dimension on the desired place you want
-            # print(f'input shape: {input.shape}')
+
             batch_size=len(input_lengths)
-            # batch_size, seq_len,_ = input.size()
-            # input=input[:,seq_len,:]
-        # self.batch_size = x.size(0)
-        # self.reset_hidden_state(batch_size)
+
         hidden=self.init_hidden(batch_size)
-        # x = self.dropout(x) # add drop out value
+
         if self._na_fill_type!='mask':
 
             output, _ = self.lstm(input, hidden)
-            # print(f'input shape: {output.shape}')
+
         else:
             pack_input = torch.nn.utils.rnn.pack_padded_sequence(input, input_lengths, batch_first=True,enforce_sorted=False)
-            # print(f'input shape: {pack_input.shape}') #packed sequence has no shape
-         # now run through LSTM
-            # pack_input=pack_input[None,:]
+
             pack_output,hidden=self.lstm(pack_input,hidden)
-            # print(f'pack_output shape: {pack_output.size}')
-        # undo the packing operation
+
             output, _ =torch.nn.utils.rnn.pad_packed_sequence(pack_output,batch_first=True)
-        # output, self.hidden = self.lstm(x.to(self.device), self.hidden)
-        # Decode the hidden state of the last time step
-        y_pred = self.linear(output)[:, -1,:]# if the label doesn't contain seq size, then this is correct
-        # y_pred = torch.sigmoid(y_pred)#<---added to make sure output is [0,1]
-        return y_pred #(seq_len, output_size)
-# ----LSTM for interpretability analysis on cpu---
+            y_pred = self.linear(output)[:, -1,:]
+          return y_pred
 
 
-class LSTM_int(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size):
-        super().__init__() 
-        self.input_size = input_size   
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.output_size = output_size
-        # self.device = device 
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.linear = nn.Linear(hidden_size, output_size)
-
-    def reset_hidden_state(self): #here is the initial hidden state and cell state
-        self.hidden = (torch.zeros(self.num_layers, self.batch_size, self.hidden_size),
-                       torch.zeros(self.num_layers, self.batch_size, self.hidden_size))
-        
-    def forward(self, x):
-        # input shape: (batch, seq_len, input_size) (how many sequences, train window, how many features)
-        # output shape: (seq_len, output_size, input_size)
-        self.batch_size = x.size(0)
-        self.reset_hidden_state()
-        # x = self.dropout(x) # add drop out value
-        output, self.hidden = self.lstm(x, self.hidden)
-        # Decode the hidden state of the last time step
-        y_pred = self.linear(output)[:, -1,:]# if the label doesn't contain seq size, then this is correct
-        return y_pred #(seq_len, output_size)
-# --------------AdaRNN non transfer functions----------------
 
 
 class AdaRNN_noTL(nn.Module):
@@ -136,7 +92,6 @@ class AdaRNN_noTL(nn.Module):
             features.append(rnn)
             in_size = hidden
         self.features = nn.Sequential(*features)
-        # features are generated after two layers of GRU of the input
 
         if use_bottleneck == True:  # finance
             self.bottleneck = nn.Sequential(
@@ -176,13 +131,6 @@ class AdaRNN_noTL(nn.Module):
             self.gate[i].bias.data.fill_(0.0)
 
     def forward(self, data, len_win=0):
-        # if self._na_fill_type!='mask':
-        #     input=data
-        #     batch_size = input.shape[0]
-        #     # print(f'input shape: {input.shape}')
-        # else:
-        #     input, input_lengths=data
-        #     batch_size=len(input_lengths)
         out = self.gru_features(data)
         fea = out[0]
         if self.use_bottleneck == True:
@@ -209,8 +157,7 @@ class AdaRNN_noTL(nn.Module):
             input, input_lengths=data
             batch_size=len(input_lengths)
             x_input = torch.nn.utils.rnn.pack_padded_sequence(input, input_lengths, batch_first=True,enforce_sorted=False)
-        # print(f'x_input.shape {x_input.shape}')
-        
+
         for i in range(self.num_layers):
             out, _ = self.features[i](x_input.float())
             if self._na_fill_type=='mask':
@@ -359,7 +306,7 @@ class Transformer(nn.Module):
             input, input_lengths=data
             
              #use none to increase dimension on the desired place you want
-            # print(f'input shape: {input.shape}')
+
             batch_size=len(input_lengths)
         K = input.shape[1]
         encoding = self._embedding(input)
