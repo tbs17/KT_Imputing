@@ -225,8 +225,7 @@ class LSTMVAE(nn.Module):
         weight = next(self.parameters())
         return (weight.new_zeros(self.num_layers, batch_size, self.hidden_dim),
                 weight.new_zeros(self.num_layers, batch_size, self.hidden_dim))
-                # .float().to(self.device)
-                # reinforce the tensor to be on the cuda for evaluation issues 
+
     def encode(self, x):
         """
         Encode the passed parameter
@@ -236,22 +235,14 @@ class LSTMVAE(nn.Module):
         """
 
         batch_size = x.shape[0]
-        # print(f'batch_size :{x.size()}')
-        # numpy uses float64 by default and pytorch uses float32
-        # print(f'batch_size:{batch_size}')
+
         hidden = self.init_hidden(batch_size)
-        # print(f'data/hidden[0].dtype:{x.dtype}/{hidden[0].dtype}')
-        # when float, it's data/hidden[0].dtype:torch.float32/torch.float32
-        # when not changing anything：
+
         x ,hidden_encoder= self.encoder_lstm(x,hidden)
-        # print(f'input shape after lstm and before: {x.shape}')
-        # b/c we are looking for the mean and var of the latent space, it needs the output from the latent space (that is the hidden states)
-        # print(f'hidden state shape: {hidden_encoder[0].shape}\n'
-        # f'cell state shape: {hidden_encoder[1].shape}')
-        # print(f'hidden shape:{hidden[0].shape}')
+
         mu=self.mu(hidden_encoder[0])
         log_var=self.log_var(hidden_encoder[0])
-        # print(f'mu/log var shape:{mu.shape}/{log_var.shape}')
+  
         return mu, log_var
 
     def decode(self, x,z):
@@ -261,18 +252,16 @@ class LSTMVAE(nn.Module):
         :param z:  latent sample
         :return: reconstructed data
         """
-        # h3 = F.relu(self.fc3(z))
-        # h4 = F.relu(self.fc31(h3))
-        # return torch.sigmoid(self.fc4(h4)) #sigmoid outputs a probability that [0,1]
+
         hidden_decoder=self.init_hidden_decoder(z)
-        # print(f'hidden_decoder shape:{hidden_decoder.shape}')
+      
         hidden_decoder=(hidden_decoder,hidden_decoder)
 
         output,hidden_decoder=self.decoder_lstm(x,hidden_decoder)
-        # print(f'output shape after decoder_lstm: {output.shape}')
+
         
         x_hat=self.output(output)
-        # print(f'x shape given z: {x_hat.shape}')
+ 
         reconstruction = torch.sigmoid(x_hat) 
         return reconstruction
 
@@ -312,33 +301,21 @@ class LSTMVAE(nn.Module):
         T=x.shape[1]
         log_vy = self.min_log_vy + F.softplus(self._log_vy - self.min_log_vy)
         loss = nn.MSELoss(reduction='none')
-        # print(f'recon_x/x/mask shape:{recon_x.shape}/{x.shape}/{mask.shape}')
-        # recon_reshape=recon_x.view(-1, self.num_dim)
-        # x_reshape= x.view(-1, self.num_dim)
-        # mask_reshape=mask.view(-1, self.num_dim)
-        # print(f'recon_x/x/mask reshape:{recon_x.shape}/{x.shape}/{mask.shape}')
-        se = torch.mul(loss(recon_x.view(-1, self.num_dim), x.view(-1, self.num_dim)), mask.view(-1, self.num_dim))
-        # se shape: se shape:torch.Size([120, 11], subjects per batch =6 and T=20
-        mask_sum = torch.sum(mask.view(-1, self.num_dim), dim=1)
-        # original:mask_sum = torch.sum(data_mask_n.view(-1, 37), dim=1)
 
-        mask_sum[mask_sum == 0] = 1 #when the sum is 0, reset it to 1, otherwise, it will be the sum of the missing value (n*1)
-        # print(f'mask_sum shape:{mask_sum.shape}')torch.Size([11])
-        mse = torch.sum(se, dim=1) / mask_sum #missing values will then be counted into calculating the mse as its denominator involves the total number of data points
-        # print(f'mse shape:{mse.shape}')#
+        se = torch.mul(loss(recon_x.view(-1, self.num_dim), x.view(-1, self.num_dim)), mask.view(-1, self.num_dim))
+
+        mask_sum = torch.sum(mask.view(-1, self.num_dim), dim=1)
+    
+
+        mask_sum[mask_sum == 0] = 1 
+        mse = torch.sum(se, dim=1) / mask_sum 
         nll = se / (2 * torch.exp(self._log_vy))
         nll += 0.5 * (np.log(2 * math.pi) + self._log_vy)
-        # print(f'nll/mse shape before summing:{nll.shape}/{mse.shape}')
-        # nll/mse shape before summing:torch.Size([33280, 11])/torch.Size([33280]) with bs=256,dim=11
-        # other times, the data comes in, it will count its valid values excluding NAs, so there will be nll/mse shape before summing:torch.Size([9880, 11])/torch.Size([9880]) or torch.Size([8320, 11])/torch.Size([8320])
         nll=torch.sum(nll, dim=1) 
-        # print(f'nll/mse shape after summing(nll for 1 sum):{nll.shape}/{mse.shape}')
-        # ll/mse shape after summing(nll for 1 sum):torch.Size([33280])/torch.Size([33280])
+        
         nll=torch.sum(nll.reshape(batch_size,-1),dim=1) #
         mse=torch.sum(mse.reshape(batch_size,-1),dim=1)
-        # print(f'nll/mse shape after summing:{nll.shape}/{mse.shape}')
-        # nll/mse shape after summing:torch.Size([256])/torch.Size([256])
-        # print(f'mse/nll shape:{mse.shape}/{nll.shape}')# mse and nll shape:[256]
+    
         return mse, nll
 
 
@@ -447,11 +424,10 @@ class SimpleVAE(nn.Module):
         loss = nn.MSELoss(reduction='none')
         se = torch.mul(loss(recon_x.view(-1, self.num_dim), x.view(-1, self.num_dim)), mask.view(-1, self.num_dim))
         mask_sum = torch.sum(mask.view(-1, self.num_dim), dim=1)
-        # original:mask_sum = torch.sum(data_mask_n.view(-1, 37), dim=1)
+      
 
-        mask_sum[mask_sum == 0] = 1 #when the sum is 0, reset it to 1, otherwise, it will be the sum of the missing value (n*1)
-        mse = torch.sum(se, dim=1) / mask_sum #missing values will then be counted into calculating the mse as its denominator involves the total number of data points
-
+        mask_sum[mask_sum == 0] = 1 
+        mse = torch.sum(se, dim=1) / mask_sum 
         nll = se / (2 * torch.exp(self._log_vy))
         nll += 0.5 * (np.log(2 * math.pi) + self._log_vy)
         return mse, torch.sum(nll, dim=1)
@@ -573,16 +549,14 @@ if __name__ == "__main__":
                 [recon_loss, nll] = nnet_model.loss_function(recon_batch, data, mask)
                 if type_nnet=='rnn':
                     KLD=-0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(),dim=0)
-                # print(f'KLD size:{KLD.shape}')
+        
                     KLD=KLD.sum(-1)               
                 else:
                     KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim=1)
                 if loss_function == 'nll':
                     loss = torch.sum(nll + KLD)
                 elif loss_function == 'mse':
-                    # print(f'recon_loss/kld shape:{recon_loss.shape}/{KLD.shape}') #
-                    # 
-                    # recon_loss/kld shape neesd to be:torch.Size([256)/torch.Size([256]) if batch size =256
+     
                     loss = torch.sum(recon_loss + KLD)
 
                 loss.backward()                                         # compute gradients
@@ -614,17 +588,15 @@ if __name__ == "__main__":
             if epoch%save_cadence==0:print(f'...saving final model into {save_path}/{marker}_vae_epoch{best_epo_list[-1]}_val_loss{best_val_loss:.4f}.pth...') 
     else:
         assert model_params!='', 'please specify your model path to test!'
-        # try:
+ 
         if model_params:
             nnet_model.load_state_dict(torch.load(model_params, map_location=torch.device('cpu')),strict=False)
-            # nnet_model = nnet_model.double().to(device) 
-        # except:
-            # print('..loading pre-trained model failed..')
+
  
 
     if run_tests:
         print(f'...running test and get decoder loss...')
-        # VAEtest(batch_size,num_workers,dataset_type,test_dataset, nnet_model, type_nnet, id_covariate)
+    
         X_df,recon_df,gen_w_stu = VAEoutput(batch_size,num_workers,out_path,ref_df_path,dataset_type,nnet_model, test_dataset,type_nnet)
 
 

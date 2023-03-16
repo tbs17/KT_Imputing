@@ -108,35 +108,7 @@ if __name__ == "__main__":
     else:
         prediction_dataset = None
 
-    #Set up generation dataset
-    # if generate_images:
-    #     if type_nnet == 'conv':
-    #         generation_dataset = HealthMNISTDatasetConv(csv_file_data=csv_file_generation_data,
-    #                                                     csv_file_label=csv_file_generation_label,
-    #                                                     mask_file=generation_mask_file,
-    #                                                     root_dir=data_source_path,
-    #                                                     transform=transforms.ToTensor())
 
-    #     elif type_nnet == 'simple':
-    #         if dataset_type=='HealthMNIST':
-    #             generation_dataset = HealthMNISTDataset(csv_file_data=csv_file_generation_data,
-    #                                                 csv_file_label=csv_file_generation_label,
-    #                                                 mask_file=generation_mask_file,
-    #                                                 root_dir=data_source_path,
-    #                                                 transform=transforms.ToTensor())
-    #         elif dataset_type == 'Physionet':
-    #             generation_dataset =PhysionetDataset(data_file=csv_file_generation_data, root_dir=data_source_path,data_format='2d')
-    #     elif type_nnet=='rnn':
-    #         if dataset_type == 'Physionet':
-    #             generation_dataset = PhysionetDataset(data_file=csv_file_generation_data, root_dir=data_source_path,data_format='2d')
-    #             gen_data=np.load(os.path.join(data_source_path,csv_file_generation_data),allow_pickle=True)
-    #             P_gen_varyL=len(np.unique(gen_data['outcome_attrib'][:,id_covariate]))
-    #             print(f'..there are {P_gen_varyL} total students in the generation set...')
-
-    # else:
-    #     generation_dataset = None
-
-    #Set up validation dataset
     if run_validation:
         if dataset_type == 'HealthMNIST':
             validation_dataset = HealthMNISTDatasetConv(csv_file_data=csv_file_validation_data,
@@ -193,10 +165,10 @@ if __name__ == "__main__":
         print("ERROR: Dataset is empty")
         exit(1)
 
-    # print(f' dataset dtype:{dataset.dtype}')
+
     Q = len(dataset[0]['label'])
     
-    # len(dataset[0]['label']) #dataset is a list, can be used with idx, Q is the total number of variables
+
     # ----------end on setting up train/val/test/pred/gen dataset------------
     print(f'Q is the number of covariates:{Q}')
 
@@ -226,7 +198,7 @@ if __name__ == "__main__":
         valid_len=N_batches*batch_size
         print(f'..loading training data with actual_data_len: {actual_data_len} and batch size=subjects_per_batch*T {batch_size} and N_batches=actual_data_len//batch_size={N_batches}...')
         setup_dataloader = DataLoader(dataset, batch_sampler=BatchSampler(SubjectSampler(dataset, P_train, T), batch_size, drop_last=True), num_workers=num_workers)
-    # DataLoader(dataset, batch_size=subjects_per_batch*T, shuffle=False, num_workers=num_workers,drop_last=True)
+ 
     
         # step4.1-----Get values for GP initialisation-------:
 
@@ -245,21 +217,19 @@ if __name__ == "__main__":
     # STEP4: ===============set up Data Loader for GP initialisation, train GP models=================
 
 
-    # Kalle: Hard-coded batch size 1000, need to adapt to the dataset
-    # setup_dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     # # step4.1-----Get values for GP initialisation-------:
   
     Z = torch.zeros(actual_data_len, latent_dim, dtype=torch.double).to(device)
 
     train_x = torch.zeros(actual_data_len, Q, dtype=torch.double).to(device)
-    # print(f'Z/train_x shape:{Z.shape}/{train_x.shape}')
+
     nnet_model.eval()
     label_id_list=[]
     with torch.no_grad():
         print('...we need to generate the mu and logvar and general Z from training set...')
         for batch_idx, sample_batched in enumerate(tqdm(setup_dataloader,total=N_batches)):
-            # no mini-batching. Instead get a batch of dataset size
+ 
             label_id = sample_batched['idx']
             train_x[label_id] = sample_batched['label'].double().to(device)
             if dataset_type=='Physionet':
@@ -273,7 +243,7 @@ if __name__ == "__main__":
             covariates = torch.cat((train_x[label_id, :id_covariate], train_x[label_id, id_covariate+1:]), dim=1)
             
             mu, log_var = nnet_model.encode(data)
-            # print(f'mu/log_var shape and label_id len:{mu.shape}/{log_var.shape}/{len(label_id)})')#(2,32,64) label_len=32
+
             if type_nnet=='rnn':
          
                 sampled_z=nnet_model.sample_latent(mu, log_var).mean(dim=0)
@@ -289,11 +259,6 @@ if __name__ == "__main__":
         
     print(f'Z/train_x shape after dropping last batch:{Z.shape}/{train_x.shape}')
 
-    # total_sample_indices=len(label_id_list)*subjects_per_batch*T
-    # # print(f'length of label id list:{len(label_id_list)} and we got total sample indices: {total_sample_indices}')
-    # Z=Z[:total_sample_indices]
-    # train_x=train_x[:total_sample_indices]
-    # print(f'Z/train_x shape after dropping last batch:{Z.shape}/{train_x.shape}')
     print('\n====SET UP GP MODEL====')
     covar_module = []
     covar_module0 = []
@@ -302,7 +267,6 @@ if __name__ == "__main__":
     likelihoods = []
     gp_models = []
     adam_param_list = []
-    # ,collate_fn=partial(collate_3d,T=T)
 
 
     # step4.2-----training for GP prior, covar_module0 and covar_module1---------
@@ -315,10 +279,7 @@ if __name__ == "__main__":
     # step4.2.1---hensman training style set up----
     if hensman:
         likelihoods = gpytorch.likelihoods.GaussianLikelihood(batch_shape=torch.Size([latent_dim]),
-            noise_constraint=gpytorch.constraints.GreaterThan(1.000E-08)).to(device) # A Likelihood in GPyTorch specifies the mapping from latent function values f(X) to observed labels y. 
-    # if input is a sample from f(x), then output will be the conditional distribution of p(y|f(x))
-    # if the input is a distribution f(x), the output will be the marginal distribution of p(y|x)
-    # in the case of regression this might be a Gaussian distribution, as y(x) is equal to f(x) plus Gaussian noise
+            noise_constraint=gpytorch.constraints.GreaterThan(1.000E-08)).to(device) 
         if constrain_scales:
             likelihoods.noise = 1
             likelihoods.raw_noise.requires_grad = False
@@ -335,18 +296,17 @@ if __name__ == "__main__":
         zt_list = torch.zeros(latent_dim, M, Q, dtype=torch.double).to(device)
         print(f'zt_list.shape:{zt_list.shape}')
         for i in range(latent_dim):
-            #zt_list[i] = train_x[np.random.choice(N, M, replace=False)].clone().detach()
-            #zt_list[i]=torch.cat((train_x[0:22], train_x[110:132]), dim=0).clone().detach()
+
             
             train_x_len=train_x.shape[0]
             target_list=torch.cat((train_x[0:int(0.5*M)], train_x[int(train_x_len/2):int(train_x_len/2)+int(0.5*M)]), dim=0)
             
             zt_list[i]=target_list.clone().detach()
-        #zt_list.requires_grad_(True)
+
 
         adam_param_list.append({'params': covar_module0.parameters()})
         adam_param_list.append({'params': covar_module1.parameters()})
-        #adam_param_list.append({'params': zt_list})
+
 
 
 
@@ -409,17 +369,14 @@ if __name__ == "__main__":
                 covar_module1.append(additive_kernel1.to(device))           # additive kernel with id covariate
                 gp_models.append(ExactGPModel(train_x, Z[:, i].view(-1).type(torch.DoubleTensor), likelihoods[i],
                                                 covar_module0[i] + covar_module1[i]).to(device))
-                #z_init = train_x[np.random.choice(N, M, replace=False)]     # initialise inducing points
-                #Hardcoded for generation_test3
-                # z_iniT=Noneorch.cat((train_x[20:60], train_x[10000:10040]), dim=0)
+
                 z_init=torch.cat((train_x[20:20+int(2/3*M)], train_x[10000:10000+int(2/3*M)]), dim=0)
-                #Hardcoded for generation_test
-                #z_iniT=Noneorch.cat((train_x[0:40], train_x[2000:2040]), dim=0)
+       
                 zt = torch.nn.Parameter(z_init.clone().cpu().double().detach(), requires_grad=False)
                 zt_list.append(zt)
                 adam_param_list.append({'params': covar_module0[i].parameters()})
                 adam_param_list.append({'params': covar_module1[i].parameters()})
-                #adam_param_list.append({'params': zt_list[i]})
+   
             else:
                 additive_kernel = generate_kernel(cat_kernel, bin_kernel, sqexp_kernel, cat_int_kernel, bin_int_kernel,
                                                     covariate_missing_val)
@@ -448,13 +405,9 @@ if __name__ == "__main__":
 
     nnet_model.train()
     adam_param_list.append({'params': nnet_model.parameters()})
-    optimiser = torch.optim.Adam(adam_param_list, lr=1e-3) #collect all the parameters needs to train and feed into optimizer to optimize
-    # this adam param_list includes parameters from covar_module0/1, m, H, gp_model.parameters, nnet_model parameters
+    optimiser = torch.optim.Adam(adam_param_list, lr=1e-3) 
 
 
-    # if memory_dbg:
-    #     print("...Max memory allocated during initialisation: {:.2f} MBs....".format(torch.cuda.max_memory_allocated(device)/(1024**2)))
-    #     torch.cuda.reset_max_memory_allocated(device)
 
     if type_KL == 'closed':
         covar_modules = [covar_module]
@@ -486,11 +439,10 @@ if __name__ == "__main__":
                                     generation_dataset, prediction_dataset, gp_model, csv_file_test_data=csv_file_test_data,
                                     csv_file_test_label=csv_file_test_label, test_mask_file=test_mask_file,
                                     data_source_path=data_source_path)
-            # penalty_term_arr, net_train_loss_arr, nll_loss_arr, recon_loss_arr, kld_loss_arr, m, H, best_epoch
+
             m, H = _[5], _[6]
             best_model,best_covar_module0, best_covar_module1,best_likelihoods=_[8],_[9],_[10],_[11]
-            # print(f'm/H shape after training:{m.shape}/{H.shape}')
-            # m/H shape after training:torch.Size([64, 60, 1])/torch.Size([64, 60, 60])
+     
         elif mini_batch:
             print('using mini_batch training for vae')
             _ = minibatch_training(dataset_type,nnet_model, type_nnet, epochs, dataset,
@@ -531,24 +483,15 @@ if __name__ == "__main__":
         # # step4.2.4---saving-----
 
         print(f'...Saving diagnostics.pkl, plot_values, final-vae model, gp_model, zt_list, m, H into {save_path}...')
-        # penalty_term_arr, net_train_loss_arr, nll_loss_arr, recon_loss_arr, kld_loss_arr, m, H, best_epoch
+
         pd.to_pickle([penalty_term_arr, net_train_loss_arr, nll_loss_arr, recon_loss_arr, gp_loss_arr],
                         os.path.join(save_path, f'{marker_cur}_diagnostics.pkl'))
 
         pd.to_pickle([train_x, mu, log_var, Z, label_id], os.path.join(save_path, f'{marker_cur}_plot_values.pkl'))
-        # torch.save(nnet_model.state_dict(), os.path.join(save_path, f'{marker_cur}_final-vae_model.pth'))
+    
         
         if hensman:
-            # try:
-            #     torch.save(gp_model.state_dict(), os.path.join(save_path, f'{marker_cur}_gp_model.pth'))
-            #     torch.save(best_likelihoods.state_dict(), os.path.join(save_path, f'{marker_cur}_best_likelihoods.pth'))
-            #     torch.save(zt_list, os.path.join(save_path, f'{marker_cur}_zt_list.pth'))
-                
-            #     # latent_D=64,M=60
-            #     #m/H shape before training:torch.Size([64, 60, 1])/torch.Size([64, 60, 60])
-            #     torch.save(m, os.path.join(save_path, f'{marker_cur}_m.pth'))
-            #     torch.save(H, os.path.join(save_path, f'{marker_cur}_H.pth'))
-            # except:
+
             pass
 
         else:
@@ -574,92 +517,15 @@ if __name__ == "__main__":
         penalty_term_arr, net_train_loss_arr, nll_loss_arr, recon_loss_arr, gp_loss_arr = _[0], _[1], _[2], _[3], _[4]
         print('...Loaded diagnostics...')
         nnet_model.load_state_dict(torch.load(os.path.join(gp_model_folder,f'{marker_prev}_{model_flag}-vae_model.pth'), map_location=torch.device(device)))
-        #only when the model on cpu is allowable to eval
+
         print('...Loaded nnet model...')
         covar_module0.load_state_dict(torch.load(os.path.join(gp_model_folder,f'{marker_prev}_best_covar_module0.pth'), map_location=torch.device(device)))
-        #only when the model on cpu is allowable to eval
+
         print('...Loaded best_covar_module0 model...')
         covar_module1.load_state_dict(torch.load(os.path.join(gp_model_folder,f'{marker_prev}_best_covar_module1.pth'), map_location=torch.device(device)))
-        #only when the model on cpu is allowable to eval
+
         print('...Loaded best_covar_module1 model...')
         best_model=nnet_model
         best_covar_module0=covar_module0
         best_covar_module1=covar_module1
-
-    # ===step 5: generate data======
-    # # data_batches=10
-    # if memory_dbg:
-    #     print(">>>Max memory allocated after training and validation: {:.2f} MBs, we reset max mem alloc and empty cache".format(torch.cuda.max_memory_allocated(device)/(1024**2)))
-    #     torch.cuda.reset_max_memory_allocated(device)
-    #     torch.cuda.empty_cache()
-
-    
-    # # ===step 5: generate data======
-
-    # if results_path and generation_dataset:
-    #     print('...Generate using best model...')
-    #     if varying_T:
-    #         n_batches = (P_pred + subjects_per_batch - 1)//subjects_per_batch
-    #         print(f'varying_T is true, you are using VaryingLengthSubjectSampler to form a  dataloader with n_batches= (P + subjects_per_batch - 1)//subjects_per_batch :{n_batches}')
-    #         actual_data_len=subjects_per_batch*N_batches
-    #         prediction_dataloader = DataLoader(prediction_dataset, batch_sampler=VaryingLengthBatchSampler(
-    #         VaryingLengthSubjectSampler(prediction_dataset, id_covariate), batch_size=subjects_per_batch,drop_last=True),
-    #                                         num_workers=num_workers)
-    #     else:
-
-    #         P_pred=len(prediction_dataset)//T
-    #         batch_size=subjects_per_batch*T
-    #         actual_data_len=P_pred*T
-    #         N_batches=actual_data_len//batch_size
-    #         valid_len=N_batches*batch_size
-       #         print(f'..loading data with batch size=subjects_per_batch*T {batch_size} and N_batches=actual_data_len//batch_size={N_batches}...')
-    #         prediction_dataloader = DataLoader(prediction_dataset, batch_sampler=BatchSampler(SubjectSampler(prediction_dataset, P_pred, T), batch_size, drop_last=True), num_workers=num_workers)
-    #         # DataLoader(prediction_dataset, batch_sampler=BatchSampler(SubjectSampler(prediction_dataset, P, T), batch_size=subjects_per_batch*T, drop_last=True),
-    #         #                                 num_workers=num_workers)
-
-    #     print(f'prediction dataloader length:{N_batches} with actual_data_len:{actual_data_len}')
-    #     full_mu = torch.zeros(actual_data_len, latent_dim, dtype=torch.double).to(device)
-    #     prediction_x = torch.zeros(actual_data_len, Q, dtype=torch.double).to(device)
-    #     with torch.no_grad():
-    #         for batch_idx, sample_batched in enumerate(tqdm(prediction_dataloader,total=len(prediction_dataloader))):
-    #             label_id = sample_batched['idx']
-    #             label=sample_batched['label']  
-    #             if type_nnet=='rnn':
-    #                 data = sample_batched['data']
-    #                 data=data.reshape(subjects_per_batch,T,data.shape[-1])
-    #             else:
-    #                 data = sample_batched['digit']
-    #             prediction_x[label_id] = label.double().to(device)
-    #             data=data.double().to(device)
-    #             covariates = torch.cat(
-    #                 (prediction_x[label_id, :id_covariate], prediction_x[label_id, id_covariate + 1:]),
-    #                 dim=1)
-
-    #             mu, log_var = best_model.encode(data)
-    #             if type_nnet=='rnn':
-    #                 mu = mu.mean(0)
-    #                 mu=torch.stack([mu for i in range(T)],dim=1).reshape(-1,latent_dim)
-                
-    #             full_mu[label_id] = mu
-    #     if type_nnet=='rnn':
-            
-    #         print(f'valid samples:{valid_len}')
-    #         prediction_x=prediction_x[:valid_len]
-    #         full_mu=full_mu[:valid_len]
-    #     print(f'full_mu/prediction_x shape/batch_idx:{full_mu.shape}/{prediction_x.shape}/{batch_idx}')   
-    #     best_covar_module0.eval()
-    #     best_covar_module1.eval()
-    #     out_path=f'{save_path}-{marker_cur}'
-    #     print(f'out_path:{out_path}')
-        
-    #     with torch.no_grad():
-    #         if type_KL == 'GPapprox' or type_KL == 'GPapprox_closed':
-        
-                
-    #             X_df,recon_df,gen_w_stu=recon_complete_gen(subjects_per_batch,num_workers,dataset_type,generation_dataset, best_model, type_nnet, out_path, 
-    #             best_covar_module0, best_covar_module1, likelihoods, latent_dim, ref_df_path, prediction_x, full_mu, zt_list, P_pred, T, id_covariate, varying_T)
-    # if memory_dbg:
-    #     print("Max memory allocated during tests: {:.2f} MBs".format(torch.cuda.max_memory_allocated(device)/(1024**2)))
-    #     torch.cuda.reset_max_memory_allocated(device)
-
 

@@ -128,10 +128,9 @@ if __name__ == "__main__":
         print("ERROR: Dataset is empty")
         exit(1)
 
-    # print(f' dataset dtype:{dataset.dtype}')
     Q = len(prediction_dataset[0]['label'])
 
-    # len(dataset[0]['label']) #dataset is a list, can be used with idx, Q is the total number of variables
+
     # ----------end on setting up train/val/test/pred/gen dataset------------
     print(f'Q is the number of covariates:{Q}')
 
@@ -166,10 +165,7 @@ if __name__ == "__main__":
     f'marker_cr: {marker_cur}')
     if hensman:
         likelihoods = gpytorch.likelihoods.GaussianLikelihood(batch_shape=torch.Size([latent_dim]),
-            noise_constraint=gpytorch.constraints.GreaterThan(1.000E-08)).to(device) # A Likelihood in GPyTorch specifies the mapping from latent function values f(X) to observed labels y. 
-    # if input is a sample from f(x), then output will be the conditional distribution of p(y|f(x))
-    # if the input is a distribution f(x), the output will be the marginal distribution of p(y|x)
-    # in the case of regression this might be a Gaussian distribution, as y(x) is equal to f(x) plus Gaussian noise
+            noise_constraint=gpytorch.constraints.GreaterThan(1.000E-08)).to(device) 
         if constrain_scales:
             likelihoods.noise = 1
             likelihoods.raw_noise.requires_grad = False
@@ -183,19 +179,19 @@ if __name__ == "__main__":
                                 covar_module0 + covar_module1).to(device)
 
     try:
-    # print(gp_model)
+
         print('!!!!remember to specify strict=False in the load_state_dict, otherwise, will have layer mismatch!!!')
         gp_model.load_state_dict(torch.load(os.path.join(gp_model_folder, f'{marker_prev}_gp_model.pth'), map_location=torch.device(device)),strict=False)
         zt_list = torch.load(os.path.join(gp_model_folder, f'{marker_prev}_zt_list.pth'), map_location=torch.device(device))
         print('...Loaded GP models and zt_list...')
         covar_module0.load_state_dict(torch.load(os.path.join(gp_model_folder,f'{marker_prev}_best_covar_module0.pth'), map_location=torch.device(device)),strict=False)
-        #only when the model on cpu is allowable to eval
+  
         print('...Loaded best_covar_module0 model...')
         covar_module1.load_state_dict(torch.load(os.path.join(gp_model_folder,f'{marker_prev}_best_covar_module1.pth'), map_location=torch.device(device)),strict=False)
-        #only when the model on cpu is allowable to eval
+ 
         print('...Loaded best_covar_module1 model...')
         likelihoods.load_state_dict(torch.load(os.path.join(gp_model_folder,f'{marker_prev}_best_likelihoods.pth'), map_location=torch.device(device)),strict=False)
-        #only when the model on cpu is allowable to eval
+
         print('...Loaded best_likelihoods module...')
     except:
         print('...GP model/zt_list/best_covar_module0/best_covar_module1/likelihoods loading failed!...')
@@ -210,7 +206,7 @@ if __name__ == "__main__":
     print('===we don not want training process, go directly to infer====')
 
     nnet_model.load_state_dict(torch.load(os.path.join(gp_model_folder,f'{marker_prev}_{model_flag}-vae_model.pth'), map_location=torch.device(device)),strict=False)
-    #only when the model on cpu is allowable to eval
+
     print('!!change model parameters to double, otherwise, input and model parameter gonna have dtype mismatch!!')
     nnet_model = nnet_model.double().to(device) 
     print('...Loaded nnet model...')
@@ -239,8 +235,7 @@ if __name__ == "__main__":
             P_pred_actual=valid_len//T
             print(f'..loading {P_pred} prediction students and prediction data with actual_data_len/valid_len: {actual_data_len}/{valid_len} and batch size=subjects_per_batch*T {batch_size} and N_batches=actual_data_len//batch_size={N_batches}...')
             prediction_dataloader = DataLoader(prediction_dataset, batch_sampler=BatchSampler(SubjectSampler(prediction_dataset, P_pred, T), batch_size, drop_last=True), num_workers=num_workers)
-            # DataLoader(prediction_dataset, batch_sampler=BatchSampler(SubjectSampler(prediction_dataset, P, T), batch_size=subjects_per_batch*T, drop_last=True),
-            #                                 num_workers=num_workers)
+
 
         print(f'prediction dataloader length:{N_batches}')
         full_mu = torch.zeros(actual_data_len, latent_dim, dtype=torch.double).to(device)

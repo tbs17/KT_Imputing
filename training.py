@@ -132,16 +132,12 @@ def hensman_training(num_workers,dataset_type,nnet_model, type_nnet, epochs, dat
             data=data.double().to(device)
             train_x = label.double().to(device)
             mask = mask.double().to(device)
-            # print(f'>>data/train_x/mask shape:{data.shape}/{train_x.shape}/{mask.shape}>>')
-            # batch_size = label.shape[0] #how many data points in each batch
 
-            # covariates = torch.cat((train_x[:, :id_covariate], train_x[:, id_covariate+1:]), dim=1)
 
             recon_batch, mu, log_var = nnet_model(data)
-            # if batch_idx%cadence==0:print(f'===batch: {batch_idx}: recon_batch/data/mask shape:{recon_batch.shape}/{data.shape}/{mask.shape}==')
-            # print(f'===recon_batch/data/mask shape:{recon_batch.shape}/{data.shape}/{mask.shape}==')
+            
             [recon_loss, nll] = nnet_model.loss_function(recon_batch, data, mask)
-            # print(f'recon_loss shape:{recon_loss.shape}')
+
             recon_loss = torch.sum(recon_loss)
             nll_loss = torch.sum(nll)
 
@@ -153,7 +149,7 @@ def hensman_training(num_workers,dataset_type,nnet_model, type_nnet, epochs, dat
                  train_x, mu, log_var, zt_list, P_train, P_in_current_batch, N, natural_gradient, id_covariate, eps)
             else:
 
-                # print(f'N_batch:data.shape[0]:{N_batch}')
+       
                 P_in_current_batch = subjects_per_batch
                 if type_nnet=='rnn':
                     train_x=train_x.reshape(subjects_per_batch,T,train_x.shape[-1]).mean(1)
@@ -175,7 +171,7 @@ def hensman_training(num_workers,dataset_type,nnet_model, type_nnet, epochs, dat
             optimiser.step()
 
             if natural_gradient:
-                # print(f'm/H shape before cholesky solve during training:{m.shape}/{H.shape}')
+      
                 LH = torch.linalg.cholesky(H)
                 iH = torch.cholesky_solve(torch.eye(H.shape[-1], dtype=torch.double).to(device), LH)
                 iH_new = iH + natural_gradient_lr*(grad_H + grad_H.transpose(-1,-2))
@@ -197,18 +193,17 @@ def hensman_training(num_workers,dataset_type,nnet_model, type_nnet, epochs, dat
             nll_loss_sum += nll_loss.item() / n_batches
             kld_loss_sum += kld_loss.item() / n_batches
         print(f'Iter {epoch}/{epochs} - Net Loss: {net_loss_sum:.3f}  - KLD loss: {kld_loss_sum:.3f}  - NLL Loss: {nll_loss_sum:.3f}  - Recon Loss: {recon_loss_sum:.3f}' , flush=True)
-        # if batch_idx%cadence==0:print('Iter %d/%d - Loss: %.3f  - GP loss: %.3f  - NLL Loss: %.3f  - Recon Loss: %.3f' % (
-        #     epoch, epochs, net_loss_sum, kld_loss_sum, nll_loss_sum, recon_loss_sum), flush=True)
+    
         penalty_term_arr = np.append(penalty_term_arr, 0.0)
         net_train_loss_arr = np.append(net_train_loss_arr,  net_loss_sum)
         recon_loss_arr = np.append(recon_loss_arr, recon_loss_sum)
         nll_loss_arr = np.append(nll_loss_arr, nll_loss_sum)
         kld_loss_arr = np.append(kld_loss_arr, kld_loss_sum)
         best_model,best_covar_module0, best_covar_module1,best_likelihoods=nnet_model, covar_module0, covar_module1,likelihoods
-        # if ( epoch % ep_cadence==0) and epoch != 0:
+  
         end=time.time()
         min, sec=divmod((end-start),60)
-        # print(f'..training cadence takes about {min} min and {round(sec,4)} sec')
+  
         if memory_dbg:
             print("Max memory allocated during cadence training: {:.2f} MBs, we reset max mem alloc and empty cache".format(torch.cuda.max_memory_allocated(device)/(1024**2)))
             torch.cuda.reset_max_memory_allocated(device)
@@ -231,8 +226,7 @@ def hensman_training(num_workers,dataset_type,nnet_model, type_nnet, epochs, dat
                 best_covar_module1=covar_module1
                 best_likelihoods=likelihoods
 
-                # after testing, saving the better model
-                # print('....Saving the better model after validation...')
+     
                 results_path=out_path.split('-')[0]
                 marker=out_path.split('-')[1]
                 try:
@@ -243,8 +237,7 @@ def hensman_training(num_workers,dataset_type,nnet_model, type_nnet, epochs, dat
                     torch.save(best_covar_module0.state_dict(), os.path.join(results_path, f'{marker}_best_covar_module0.pth'))
                     torch.save(best_covar_module1.state_dict(), os.path.join(results_path, f'{marker}_best_covar_module1.pth'))
                     torch.save(zt_list, os.path.join(results_path, f'{marker}_zt_list.pth'))
-                    # print(f'm/H shape before saving  after testing training:{m.shape}/{H.shape}')
-                    # m/H shape before saving  after testing training:torch.Size([64, 60, 1])/torch.Size([64, 60, 60])
+         
                     torch.save(m, os.path.join(results_path, f'{marker}_m.pth'))
                     torch.save(H, os.path.join(results_path, f'{marker}_H.pth'))
                     
@@ -463,8 +456,6 @@ def minibatch_training(dataset_type,nnet_model, type_nnet, epochs, dataset, opti
                         best_covar_module1=covar_module1
                         best_likelihoods=likelihoods
 
-                        # after testing, saving the better model
-                        # print('....Saving the better model after validation...')
                         results_path=out_path.split('-')[0]
                         marker=out_path.split('-')[1]
                         try:
@@ -475,10 +466,7 @@ def minibatch_training(dataset_type,nnet_model, type_nnet, epochs, dataset, opti
                             torch.save(best_covar_module0.state_dict(), os.path.join(results_path, f'{marker}_best_covar_module0.pth'))
                             torch.save(best_covar_module1.state_dict(), os.path.join(results_path, f'{marker}_best_covar_module1.pth'))
                             torch.save(zt_list, os.path.join(results_path, f'{marker}_zt_list.pth'))
-                            # print(f'm/H shape before saving  after testing training:{m.shape}/{H.shape}')
-                            # m/H shape before saving  after testing training:torch.Size([64, 60, 1])/torch.Size([64, 60, 60])
-                            # torch.save(m, os.path.join(results_path, f'{marker}_m.pth'))
-                            # torch.save(H, os.path.join(results_path, f'{marker}_H.pth'))
+     
 
                             if len(best_epoch_list)>=2 and best_epoch_list[-1]>best_epoch_list[-2]:
                                 os.remove(os.path.join(results_path, f'{marker}_epoch{best_epoch_list[-2]}_best_val_loss{prev_best:.4f}-vae_model.pth'))
@@ -552,7 +540,7 @@ def standard_training(dataset_type,nnet_model, type_nnet, epochs, dataset, optim
     for epoch in range(1, epochs + 1):
         for batch_idx, sample_batched in enumerate(dataloader):
 
-            # no mini-batching. Instead get a batch of dataset size.
+       
             optimiser.zero_grad()                                       # clear gradients
             label_id = sample_batched['idx']
             label = sample_batched['label']
@@ -560,8 +548,7 @@ def standard_training(dataset_type,nnet_model, type_nnet, epochs, dataset, optim
                 data = sample_batched['data'].double().to(device)
             else:
                 data = sample_batched['digit'].double().to(device)
-            # data = sample_batched['digit']
-            # data = data.double().to(device)
+        
             mask = sample_batched['mask']
             mask = mask.to(device)
 
@@ -581,7 +568,7 @@ def standard_training(dataset_type,nnet_model, type_nnet, epochs, dataset, optim
 
             for sample_iter in range(0, num_samples):
 
-                # Iterate over specified number of samples. Default: num_samples = 1.
+               
                 Z = nnet_model.sample_latent(mu, log_var)
                 gp_loss = torch.tensor([0.0]).to(device)
 

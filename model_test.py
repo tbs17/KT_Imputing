@@ -53,7 +53,7 @@ def MSE_test(T,num_workers,dataset_type,csv_file_test_data, csv_file_test_label,
 
     with torch.no_grad():
         for batch_idx, sample_batched in enumerate(dataloader_test):
-            # no mini-batching. Instead get a mini-batch of size 4000
+       
 
             label_id = sample_batched['idx']
             label = sample_batched['label']
@@ -143,8 +143,7 @@ def MSE_test_GPapprox_old(num_workers,dataset_type,csv_file_test_data, csv_file_
 
     with torch.no_grad():
         for batch_idx, sample_batched in enumerate(tqdm(dataloader_test,total=len(dataloader_test))):
-        # for batch_idx, sample_batched in enumerate(dataloader_test):
-            # no mini-batching. Instead get a mini-batch of size 4000
+
 
             label_id = sample_batched['idx']
             label = sample_batched['label']
@@ -167,13 +166,10 @@ def MSE_test_GPapprox_old(num_workers,dataset_type,csv_file_test_data, csv_file_
             # obtain the Z based on the testing data and posterior of Z from prediction samples
             # 
             Z_pred = batch_predict_varying_T(latent_dim, covar_module0, covar_module1, likelihoods, prediction_x, test_x, prediction_mu, zt_list, id_covariate, eps=1e-6)
-            # else:
-                # Z_pred = batch_predict(latent_dim, covar_module0, covar_module1, likelihoods, prediction_x, test_x, prediction_mu,zt_list,P,T,id_covariate, eps=1e-6)
-               
-            
+  
             if type_nnet=='rnn':
                 Z_pred=torch.stack([Z_pred,Z_pred],dim=0)
-                # print(f'data/z_pred shape:{data.shape}/{Z_pred.shape}')
+
             recon_Z = nnet_model.decode(data,Z_pred)
             [recon_loss_GP, nll] = nnet_model.loss_function(recon_Z, data, mask)  # reconstruction loss
             print('Decoder loss (GP): ' + str(torch.mean(recon_loss_GP)))
@@ -264,8 +260,6 @@ def MSE_test_GPapprox(num_workers,dataset_type,csv_file_test_data, csv_file_test
                 data = sample_batched['digit']
             data = data.double().to(device)
             mask = mask.double().to(device)
-            # if batch_idx%cadence==0:print(f'==batch {batch_idx}: data shape:{data.shape}')
-            # covariates = torch.cat((label[:, :id_covariate], label[:, id_covariate+1:]), dim=1).double().to(device)
 
             recon_batch, mu, log_var = nnet_model(data)
 
@@ -288,11 +282,11 @@ def MSE_test_GPapprox(num_workers,dataset_type,csv_file_test_data, csv_file_test
                     Z_pred=Z_pred.reshape(subjects_per_batch,T,latent_dim).mean(0)
 
                     Z_pred=torch.stack([Z_pred,Z_pred],dim=0)
-                    # Z_pred=torch.stack([Z_pred for i in range (num_layers)],dim=0)
+            
                     data=data.reshape(T,subjects_per_batch,data.shape[-1])
             
     
-            # print(f'data/z_pred shape:{data.shape}/{Z_pred.shape}')
+
             recon_Z = nnet_model.decode(data,Z_pred)
             [recon_loss_GP, nll] = nnet_model.loss_function(recon_Z, data, mask)  # reconstruction loss
             

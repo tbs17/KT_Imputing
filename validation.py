@@ -29,12 +29,7 @@ def validation_dubo(type_nnet,latent_dim, covar_module0, covar_module1, likeliho
     
     torch_dtype = torch.double
     v = torch.exp(log_v)
-    # print(f'P/T length:{P}/{T}')
-    # P=len(train_xt)//T
-    # reshape_dim=P* T
-    # train_xt=train_xt[:reshape_dim]
-    # v = v[:reshape_dim]
-    # m=m[:reshape_dim]
+
     if type_nnet=='rnn':
         T=1
         P=len(train_xt)
@@ -63,15 +58,13 @@ def validation_dubo(type_nnet,latent_dim, covar_module0, covar_module1, likeliho
         logDetB = 2 * torch.sum(torch.log(torch.diagonal(LB_st[i], dim1=-2, dim2=-1))).to(device)
         logDetW = 2 * torch.sum(torch.log(torch.diagonal(LW))).to(device)
         logDetSigma = -logDetK0zz + logDetB + logDetW
-        # print(f'B_st[i] and m_st shape:{B_st[i].shape}/{m_st.shape}') #B_st[i] and m_st shape:torch.Size([10, 20, 20])/torch.Size([10, 20, 1])
-        iB_m_st = torch.linalg.solve(B_st[i],m_st).to(device) #<---bug on the old function removed causing runtime error, also needs to change the order of the original A and B matrices
-    #  
+
+        iB_m_st = torch.linalg.solve(B_st[i],m_st).to(device) 
         t=torch.linalg.solve(B_st[i],m_st)
-        # print(f'torch.linalg.solve(m_st,B_st[i]) shape: {t.shape}')
-        # print(f'iB_m_st.shape:{iB_m_st.shape}') #torch.Size([10, 20, 1])
+  
         qF1 = torch.sum(m_st*iB_m_st).to(device)
         p = torch.matmul(K0xz[i].T, torch.reshape(iB_m_st, [P * T])).to(device)
-        qF2 = torch.sum(torch.linalg.solve_triangular( LW,p[:,None], upper=False)[0] ** 2).to(device) #the updated function torch.linalg.solve_triangular has its arguments reversed and does not return a copy of one of the inputs.
+        qF2 = torch.sum(torch.linalg.solve_triangular( LW,p[:,None], upper=False)[0] ** 2).to(device) 
         qF = qF1 - qF2
         tr = torch.sum(iB_st[i] * K0_st[i]) - torch.sum(K0zx_iB_K0xz * iK0zz[i])
         logDetD = torch.sum(torch.log(v[:, i])).to(device)
@@ -130,24 +123,23 @@ def validate(varying_T,subjects_per_batch,num_workers,dataset_type,nnet_model, t
             
             
             P_val=len(dataset)//T
-            # print(f'...varying_T is false, you are using subject sampler to sample {P_val} val students...')
+
             batch_size=subjects_per_batch*T
             actual_data_len=P_val*T
             N_batches=actual_data_len//batch_size
             valid_len=N_batches*batch_size
-            # print(f'..loading data with actual_data_len: {actual_data_len} and batch size=subjects_per_batch*T {batch_size} and N_batches=actual_data_len//batch_size={N_batches}...')
-    
+               
             dataloader = DataLoader(dataset, batch_sampler=BatchSampler(SubjectSampler(dataset, P_val, T), batch_size, drop_last=True), num_workers=num_workers)
 
             
     else:
         dataloader = DataLoader(dataset, batch_size=T, shuffle=False, drop_last=True,num_workers=num_workers)
-    # print(f'length of validation dataset is {len(dataset)}')
+
     len_loader=N_batches
-    # print(f'length of validation dataloader after sampling is {N_batches}')
+
     cadence=len_loader//2
     Q = len(dataset[0]['label'])
-    # P = len(dataset) // T
+
     
     full_mu = torch.zeros(actual_data_len, latent_dim, dtype=torch.double, requires_grad=True).to(device)
     full_log_var = torch.zeros(actual_data_len, latent_dim, dtype=torch.double, requires_grad=True).to(device)
@@ -175,22 +167,19 @@ def validate(varying_T,subjects_per_batch,num_workers,dataset_type,nnet_model, t
             data= data.double().to(device)
             mask = mask.double().to(device)
             full_labels[indices] = label.double().to(device)
-            # print(f'indices within a batch:{len(indices)}')
-            # covariates = torch.cat((full_labels[indices, :id_covariate], full_labels[indices, id_covariate+1:]), dim=1)
+           
             recon_batch, mu, log_var = nnet_model(data)
-            # if batch_idx%cadence==0:print(f'===validation batch: {batch_idx}: recon_batch/data/mask shape:{recon_batch.shape}/{data.shape}/{mask.shape}==')
+
             if type_nnet=='rnn':
-                # print(f'mu after NN shape:{mu.shape}')
+
                 mu=mu.mean(0)
-                # print(f'mu after NN shape after mean:{mu.shape}')
+
                 mu=torch.stack([mu for i in range (T)],dim=1).reshape(-1,latent_dim)
-                # print(f'mu after NN shape after mean after stack:{mu.shape}')
-                
-                # print(f'log_var after NN shape:{log_var.shape}')
+
                 log_var=log_var.mean(0)
-                # print(f'log_var after NN shape after mean:{log_var.shape}')
+
                 log_var=torch.stack([log_var for i in range (T)],dim=1).reshape(-1,latent_dim)
-                # print(f'log_var after NN shape after mean after stack:{log_var.shape}')
+
             
             full_mu[indices] = mu
             full_log_var[indices] = log_var
@@ -210,7 +199,7 @@ def validate(varying_T,subjects_per_batch,num_workers,dataset_type,nnet_model, t
     gp_losses = 0
     gp_loss_sum = 0
     param_list = []
-    # print(f'full_mu/full_log_var/full_labels shape:{full_mu.shape}/{full_log_var.shape}/{full_labels.shape}')
+
     if type_nnet=='rnn':
         full_mu=full_mu.reshape(N_batches*subjects_per_batch,T,full_mu.shape[-1]).mean(1)
         full_log_var=full_log_var.reshape(N_batches*subjects_per_batch,T,full_log_var.shape[-1]).mean(1)

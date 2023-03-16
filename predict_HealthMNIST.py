@@ -287,8 +287,7 @@ def recon_complete_gen(subjects_per_batch,num_workers,dataset_type,generation_da
                 data = sample_batched['digit']
             data = data.double().to(device)
             mask = mask.to(device)
-            
-            # covariates = torch.cat((label[:, :id_covariate], label[:, id_covariate+1:]), dim=1).double().to(device)
+
 
             recon_batch, mu, log_var = nnet_model(data)
             Z = nnet_model.sample_latent(mu, log_var)
@@ -307,15 +306,15 @@ def recon_complete_gen(subjects_per_batch,num_workers,dataset_type,generation_da
                     Z_pred=Z_pred.reshape(subjects_per_batch,T,latent_dim).mean(0)
 
                     Z_pred=torch.stack([Z_pred,Z_pred],dim=0)
-                    # Z_pred=torch.stack([Z_pred for i in range (num_layers)],dim=0)
+           
                     data=data.reshape(T,subjects_per_batch,data.shape[-1])
-            # if batch_idx%cadence==0:print(f'==batch{batch_idx} data and Z-pred shape:{data.shape}/{Z_pred.shape}')
+  
             recon_Z = nnet_model.decode(data,Z_pred)
             
             if type_nnet=='rnn':
                 data=data.reshape(-1,data.shape[2])
                 recon_Z=recon_Z.reshape(-1,recon_Z.shape[2])
-            # if batch_idx%cadence==0:print(f'==batch {batch_idx} data/recon_Z shape:{data.shape}/{recon_Z.shape} ==')
+
             X=pd.DataFrame(data.detach().cpu().numpy())
             X.columns=orig_cols
             recon_X=pd.DataFrame(recon_Z.detach().cpu().numpy())#recon_Z[0:160, :]
@@ -422,17 +421,15 @@ def VAEoutput(batch_size,num_workers,results_path,ref_df_path,dataset_type,nnet_
 
             recon_Z, mu, log_var = nnet_model(data)
 
-            # gen_rotated_mnist_plot(data[40:200, :].cpu(), recon_batch[40:200, :].cpu(), label[40:200, :].cpu(), seq_length=20, num_sets=8,
-            #                        save_file=os.path.join(save_path, 'recon_VAE_' + str(epoch) + '.pdf'))
-            # break
+   
             marker=results_path.split('-')[-1]
-            # save_dir='/'.join(results_path.split('/')[:-1])
+       
             save_dir=results_path.split('-')[0]
             if '_' in marker:
                 domain=marker.split('_')[0]
             else:
                 domain=marker
-            # print(f'save_dir/marker/domain:{save_dir},{marker},{domain}')
+   
 
             
             orig_cols=['seq_number', 'assessment_duration','bktcount', 'count', 'quest_difficulty',
@@ -476,10 +473,10 @@ def VAEoutput(batch_size,num_workers,results_path,ref_df_path,dataset_type,nnet_
         print(f'..saving reconstructed x and covariate info used into {out_dir}/{marker}_X.csv and {out_dir}/{marker}_ReconX.csv and {out_dir}/{marker}_Reconlabel.csv ....')
         X_df.to_csv(f'{out_dir}/{marker}_X.csv',index=False)
         recon_df.to_csv(f'{out_dir}/{marker}_ReconX.csv',index=False)
-        # X_df.to_csv(f'{out_dir}/{marker}_X.csv',index=False)
+
         label_df.to_csv(f'{out_dir}/{marker}_Reconlabel.csv',index=False)
         print(f'..saving matched reconstructed x and covariate info into {out_dir}/{marker}_ReconX_matched.csv ....')
-        # data/k12/split_data/geom_no_outlr_data_readings.csv
+
         
         label_orig=pd.read_csv(label_orig_path)
         label_orig_n=label_orig[['event_time','student_id']].iloc[:recon_df.shape[0]].reset_index(drop=True)
@@ -509,15 +506,14 @@ def predict_generate(num_workers,dataset_type,csv_file_test_data, csv_file_test_
     label_train = torch.tensor([]).to(device)
     with torch.no_grad():
         for batch_idx, sample_batched in enumerate(dataloader):
-            # no mini-batching. Instead get a mini-batch of size 4000
+          
             label_id = sample_batched['idx']
             label = sample_batched['label']
             if dataset_type=='Physionet':
                 data = sample_batched['data'].double().to(device)
             else:
                 data = sample_batched['digit'].double().to(device)
-            # data = sample_batched['digit']
-            # data = data.double().to(device)
+
             label_train = label
             data_train = data
             covariates = torch.cat((label[:, :id_covariate], label[:, id_covariate+1:]), dim=1).double().to(device)
@@ -549,16 +545,14 @@ def predict_generate(num_workers,dataset_type,csv_file_test_data, csv_file_test_
     dataloader_test = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False, num_workers=num_workers)
     with torch.no_grad():
         for batch_idx, sample_batched in enumerate(dataloader_test):
-            # no mini-batching. Instead get a mini-batch of size 4000
-
+  
             label_id = sample_batched['idx']
             label = sample_batched['label']
             if dataset_type=='Physionet':
                 data = sample_batched['data'].double().to(device)
             else:
                 data = sample_batched['digit'].double().to(device)
-            # data = sample_batched['digit']
-            # data = data.double().to(device)
+
             mask = sample_batched['mask']
             mask = mask.to(device)
             covariates = torch.cat((label[:, :id_covariate], label[:, id_covariate+1:]), dim=1).double().to(device)
@@ -583,7 +577,7 @@ def predict_generate(num_workers,dataset_type,csv_file_test_data, csv_file_test_
 
     with torch.no_grad():
         for batch_idx, sample_batched in enumerate(dataloader_full):
-            # no mini-batching. Instead get a mini-batch of size 4000
+       
 
             label_id = sample_batched['idx']
             label = sample_batched['label']
@@ -591,8 +585,7 @@ def predict_generate(num_workers,dataset_type,csv_file_test_data, csv_file_test_
                 data = sample_batched['data'].double().to(device)
             else:
                 data = sample_batched['digit'].double().to(device)
-            # data = sample_batched['digit']
-            # data = data.double().to(device)
+      
             mask = sample_batched['mask']
             mask = mask.to(device)
             covariates = torch.cat((label[:, :id_covariate], label[:, id_covariate+1:]), dim=1).double().to(device)
